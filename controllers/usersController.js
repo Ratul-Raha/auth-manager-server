@@ -73,6 +73,7 @@ const login = async (req, res, next) => {
   try {
     existingUser = await User.findOne({ email: email });
   } catch (err) {
+    console.log(err);
     return res.status(500).send({ errorMessage: "Login failed" });
   }
   if (!existingUser) {
