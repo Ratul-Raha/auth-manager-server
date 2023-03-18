@@ -102,7 +102,7 @@ const login = async (req, res, next) => {
             userId: existingUser.id,
             email: existingUser.email,
           },
-          process.env.SALT_HASH,
+          "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
           { expiresIn: "1h" }
         );
       } catch (err) {
