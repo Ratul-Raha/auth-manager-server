@@ -152,16 +152,18 @@ const addItem = async (req, res, next) => {
 
 const getCategoryWiseItem = async (req, res, next) => {
   const { type, superEmail } = req.body;
-
-  const data = await Item.find({ email: superEmail, type: type });
-  console.log(data);
+  const user = await User.findOne({email: superEmail});
+  console.log(user._id);
+  const data = await Item.find({ type: type}).where('userId').equals(user._id);
+  console.log("bbbbbbbbbbb",data);
   return res.status(200).send(data);
 };
 
 const getFolderWiseItem = async (req, res, next) => {
   const { folder, superEmail } = req.body;
 
-  const data = await Item.find({ email: superEmail, folder: folder });
+  const user = await User.findOne({email: superEmail});
+  const data = await Item.find({ folder: folder }).where('userId').equals(user._id);
   console.log(data);
   return res.status(200).send(data);
 };
@@ -204,7 +206,7 @@ const deleteItem = async (req, res, next) => {
   const { id, superEmail, type  } = req.body;
   try {
     const item = await Item.findOneAndDelete(id);
-    const allItem = await Item.find({email: superEmail, type: type});
+    const allItem = await Item.find({userEmail: superEmail, type: type});
     return res.status(200).send(allItem);
   } catch (error) {
     console.error(error);
