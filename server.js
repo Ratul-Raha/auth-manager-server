@@ -32,7 +32,7 @@ app.get("/", (req, res) => {
 });
 
 mongoose
-  .connect(process.env.ATLAS_URI, {
+  .connect("mongodb+srv://gkdratul:superpass@superpass.3xttylg.mongodb.net/test", {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
