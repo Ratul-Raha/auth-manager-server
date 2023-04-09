@@ -8,7 +8,7 @@ const itemSchema = new Schema({
   password: { type: String, required: false, minlength: 8 },
   url: { type: String, required: true },
   notes: { type: String, required: true },
-  folder: { type: String, required: true },
+  folder: { type: Schema.Types.ObjectId, ref: 'folder', required: true },
   type: { type: String, required: true },
   userId: { type: String, required: true },
 });

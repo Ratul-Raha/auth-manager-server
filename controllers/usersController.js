@@ -2,32 +2,26 @@ const User = require("../models/users");
 const Item = require("../models/item");
 const bcrypt = require("bcrypt");
 var jwt = require("jsonwebtoken");
-const { OAuth2Client } = require("google-auth-library");
-const res = require("express/lib/response");
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-const crypto = require("crypto");
-const moment = require("moment");
 const mongoose = require("mongoose");
-const { userRoles } = require("../config");
-const sgMail = require("@sendgrid/mail");
+const Folder = require("../models/folder");
+const { body, validationResult } = require("express-validator");
 
 mongoose.set("sanitizeFilter", true);
 
 const registerUser = async (req, res, next) => {
   const { name, email, password } = req.body;
-  console.log(name, email, password);
   /* check if users exists */
   let existingUser;
   try {
     existingUser = await User.findOne({ email: email });
   } catch (err) {
-    return res.status(500).send({ errorMessage: "Signup failed, try again later" });
+    return res
+      .status(500)
+      .send({ errorMessage: "Signup failed, try again later" });
   }
 
   if (existingUser) {
-    return res
-      .status(422)
-      .send({ errorMessage: "User already Exists"});
+    return res.status(422).send({ errorMessage: "User already Exists" });
   }
 
   let hashPassword;
@@ -35,7 +29,9 @@ const registerUser = async (req, res, next) => {
     const salt = await bcrypt.genSalt(10);
     hashPassword = await bcrypt.hash(password, salt);
   } catch (err) {
-    return res.status(500).send({ errorMessage: "Signup failed, try again later" });
+    return res
+      .status(500)
+      .send({ errorMessage: "Signup failed, try again later" });
   }
   const createdUser = new User({
     name,
@@ -55,23 +51,21 @@ const registerUser = async (req, res, next) => {
         },
       });
     } else {
-      return res.status(500).send({ errorMessage: "Signup failed, try again later" });
+      return res
+        .status(500)
+        .send({ errorMessage: "Signup failed, try again later" });
     }
   } catch (err) {
-    return res.status(500).send({ errorMessage: "Signup failed, try again later" });
+    return res
+      .status(500)
+      .send({ errorMessage: "Signup failed, try again later" });
   }
 };
 
-
-
 const login = async (req, res, next) => {
   const { email, password } = req.body;
-
-  console.log(email);
-
   /* check if the user exists */
   let existingUser;
-
   try {
     existingUser = await User.findOne({ email: email });
   } catch (err) {
@@ -79,21 +73,24 @@ const login = async (req, res, next) => {
     return res.status(500).send({ errorMessage: "Login failed" });
   }
   if (!existingUser) {
-    return res.status(403).send({ errorMessage: "Invalid username or password" });
+    return res
+      .status(403)
+      .send({ errorMessage: "Invalid username or password" });
   }
 
   if (existingUser) {
     let isValidPassword = false;
     try {
       isValidPassword = await bcrypt.compare(password, existingUser.password);
-      console.log(isValidPassword);
     } catch (err) {
       return res.status(500).send({
         errorMessage: "Please try again",
       });
     }
     if (!isValidPassword) {
-      return res.status(403).send({ errorMessage: "Invalid username or password" });
+      return res
+        .status(403)
+        .send({ errorMessage: "Invalid username or password" });
     } else {
       let token;
       try {
@@ -106,9 +103,7 @@ const login = async (req, res, next) => {
           { expiresIn: "1h" }
         );
       } catch (err) {
-        return res
-          .status(500)
-          .send({ errorMessage: "Login failed" });
+        return res.status(500).send({ errorMessage: "Login failed" });
       }
       res.json({
         token: token,
@@ -122,8 +117,20 @@ const login = async (req, res, next) => {
   }
 };
 
-
 const addItem = async (req, res, next) => {
+  await body("name").trim().escape().isLength({ min: 1 }).run(req);
+  await body("username").trim().escape().isLength({ min: 1 }).run(req);
+  await body("url").trim().isURL().run(req);
+  await body("password").trim().escape().isLength({ min: 6 }).run(req);
+  await body("notes").optional().trim().escape().run(req);
+  await body("type").trim().escape().isIn(["Social", "Official"]).run(req);
+  const folderData = await Folder.findOne({ folderName: req.body.folder });
+
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errorMessage: errors.array() });
+  }
+
   const { userEmail, name, username, url, password, notes, type, folder } =
     req.body;
   const user = await User.findOne({ email: userEmail });
@@ -135,7 +142,7 @@ const addItem = async (req, res, next) => {
     url: url,
     notes: notes,
     type: type,
-    folder: folder,
+    folder: folderData._id,
     userId: user._id,
   });
 
@@ -150,28 +157,46 @@ const addItem = async (req, res, next) => {
   }
 };
 
+const getAllItems = async (req, res, next) => {
+  const { folder, superEmail } = req.body;
+  const user = await User.findOne({ email: superEmail });
+  const data = await Item.find().where("userId").equals(user._id);
+  return res.status(200).send(data);
+};
+
+const getSingleItem = async (req, res, next) => {
+  const { id } = req.body;
+  const data = await Item.findById({ _id: id });
+  return res.status(200).send(data);
+};
+
 const getCategoryWiseItem = async (req, res, next) => {
   const { type, superEmail } = req.body;
-  const user = await User.findOne({email: superEmail});
-  console.log(user._id);
-  const data = await Item.find({ type: type}).where('userId').equals(user._id);
-  console.log("bbbbbbbbbbb",data);
+  const user = await User.findOne({ email: superEmail });
+
+  const data = await Item.find({ type: type })
+    .where("userId")
+    .equals(user._id)
+    .populate("folder");
   return res.status(200).send(data);
 };
 
 const getFolderWiseItem = async (req, res, next) => {
   const { folder, superEmail } = req.body;
+  const user = await User.findOne({ email: superEmail });
+  const folderData = await Folder.findOne({ folderName: folder });
+  const folderId = folderData._id;
 
-  const user = await User.findOne({email: superEmail});
-  const data = await Item.find({ folder: folder }).where('userId').equals(user._id);
-  console.log(data);
+  const data = await Item.find({ folder: folderId })
+    .where("userId")
+    .equals(user._id)
+    .populate("folder");
   return res.status(200).send(data);
 };
 
 const getCategoryWiseItemById = async (req, res, next) => {
   const { item } = req.body;
-  console.log(item);
-  const data = await Item.findById(item);
+  const data = await Item.findById(item).populate("folder");
   return res.status(200).send(data);
 };
 
@@ -187,10 +212,8 @@ const updateCategoryWiseItem = async (req, res, next) => {
       item.url = url || item.url;
       item.notes = notes || item.notes;
       item.type = type || item.type;
-      item.folder = folder || item.folder;
       try {
         const result = await item.save();
-        console.log("result", result);
         return res.status(200).send(item);
       } catch (err) {
         return next(err);
@@ -203,10 +226,10 @@ const updateCategoryWiseItem = async (req, res, next) => {
 };
 
 const deleteItem = async (req, res, next) => {
-  const { id, superEmail, type  } = req.body;
+  const { id, superEmail, type } = req.body;
   try {
     const item = await Item.findOneAndDelete(id);
-    const allItem = await Item.find({userEmail: superEmail, type: type});
+    const allItem = await Item.find({ userEmail: superEmail, type: type });
     return res.status(200).send(allItem);
   } catch (error) {
     console.error(error);
@@ -215,10 +238,10 @@ const deleteItem = async (req, res, next) => {
 };
 
 const deleteItemByFolder = async (req, res, next) => {
-  const { id, superEmail, type  } = req.body;
+  const { id, superEmail, type } = req.body;
   try {
     const item = await Item.findOneAndDelete(id);
-    const allItem = await Item.find({email: superEmail, type: type});
+    const allItem = await Item.find({ email: superEmail, type: type });
     return res.status(200).send(allItem);
   } catch (error) {
     console.error(error);
@@ -226,14 +249,103 @@ const deleteItemByFolder = async (req, res, next) => {
   }
 };
 
+const createFolder = async (req, res, next) => {
+  const { userEmail, folderName } = req.body;
+
+  let existingFolder;
+
+  existingFolder = await Folder.findOne({
+    userEmail: userEmail,
+    folderName: folderName,
+  });
+  if (existingFolder) {
+    return res
+      .status(403)
+      .send({ errorMessage: "Can not create folder with same name" });
+  } else {
+    const resultCreated = new Folder({
+      folderName: folderName,
+      userEmail: userEmail,
+    });
+
+    try {
+      const response = await resultCreated.save();
+      const folders = await Folder.find({ userEmail: userEmail });
+      return res
+        .status(200)
+        .send({ successMessage: "Fetched all the folders", folders: folders });
+    } catch (err) {
+      console.log(err);
+      return res
+        .status(403)
+        .send({ errorMessage: "Something went wrong, please try again" });
+    }
+  }
+};
+
+const updateFolder = async (req, res, next) => {
+  const { userEmail, editFolderName, updatedFolderName } = req.body;
+
+  const folder = await Folder.findOne()
+    .where("userEmail")
+    .equals(userEmail)
+    .where("folderName")
+    .equals(editFolderName);
+
+  try {
+    folder.folderName = updatedFolderName;
+
+    const response = await folder.save();
+    const folders = await Folder.find({ userEmail: userEmail });
+    return res
+      .status(200)
+      .send({ successMessage: "Fetched all the folders", folders: folders });
+  } catch (err) {
+    console.log(err);
+    return res
+      .status(403)
+      .send({ errorMessage: "Something went wrong, please try again" });
+  }
+};
+
+const getFolder = async (req, res, next) => {
+  const { userEmail } = req.body;
+
+  const folder = await Folder.find({ userEmail: userEmail });
+
+  return res
+    .status(200)
+    .send({ successMessage: "New folder is created", folders: folder });
+};
+
+const deleteFolder = async (req, res, next) => {
+  const { userEmail, folderName } = req.body;
+
+  const folderDeleted = await Folder.findOneAndDelete({
+    userEmail: userEmail,
+    folderName: folderName,
+  });
+
+  const folder = await Folder.find({ userEmail: userEmail });
+  return res
+    .status(200)
+    .send({ successMessage: "Folder is deleted", folders: folder });
+};
+
 module.exports = {
   registerUser,
   login,
   addItem,
+  getAllItems,
+  getSingleItem,
   getCategoryWiseItem,
   getFolderWiseItem,
   getCategoryWiseItemById,
   updateCategoryWiseItem,
   deleteItem,
-  deleteItemByFolder
+  deleteItemByFolder,
+  createFolder,
+  getFolder,
+  deleteFolder,
+  updateFolder,
 };
