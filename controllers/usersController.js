@@ -148,8 +148,10 @@ const addItem = async (req, res, next) => {
 
   try {
     let result = await createdItem.save();
+    const allItems = await Item.find().where("userEmail").equals(userEmail);
     return res.status(200).send({
       successMessage: "Item was added successfully!",
+      data:allItems
     });
   } catch (err) {
     console.log(err);
@@ -225,6 +227,18 @@ const updateCategoryWiseItem = async (req, res, next) => {
   }
 };
 
+const deleteDashboardItem = async (req, res, next) => {
+  const { id, superEmail, type } = req.body;
+  try {
+    const item = await Item.findOneAndDelete(id);
+    const allItem = await Item.find({ userEmail: superEmail});
+    return res.status(200).send(allItem);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Failed to delete item." });
+  }
+};
+
 const deleteItem = async (req, res, next) => {
   const { id, superEmail, type } = req.body;
   try {
@@ -233,15 +247,30 @@ const deleteItem = async (req, res, next) => {
     return res.status(200).send(allItem);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ success: false, message: "Failed to update item." });
+    res.status(500).json({ success: false, message: "Failed to delete item." });
   }
 };
 
 const deleteItemByFolder = async (req, res, next) => {
-  const { id, superEmail, type } = req.body;
+  const { id, superEmail, folder, name } = req.body;
+  const singleFolder = await Folder.findOne({folderName: folder});
+  try {
+    const item = await Item.findOneAndDelete(id);
+    const allItem = await Item.find({ email: superEmail, folder: singleFolder.id });
+    console.log(allItem)
+    return res.status(200).send(allItem);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Failed to update item." });
+  }
+};
+
+const deleteItemByCategory = async (req, res, next) => {
+  const { id, superEmail, type, name } = req.body;
   try {
     const item = await Item.findOneAndDelete(id);
     const allItem = await Item.find({ email: superEmail, type: type });
+    console.log(allItem)
     return res.status(200).send(allItem);
   } catch (error) {
     console.error(error);
@@ -343,7 +372,9 @@ module.exports = {
   getCategoryWiseItemById,
   updateCategoryWiseItem,
   deleteItem,
+  deleteDashboardItem,
   deleteItemByFolder,
+  deleteItemByCategory,
   createFolder,
   getFolder,
   deleteFolder,

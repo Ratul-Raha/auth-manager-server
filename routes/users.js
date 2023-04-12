@@ -22,7 +22,9 @@ router.post(
   usersController.updateCategoryWiseItem
 );
 router.post("/delete-item", usersController.deleteItem);
+router.post("/delete-dashboard-item", usersController.deleteDashboardItem);
 router.post("/delete-item-by-folder", usersController.deleteItemByFolder);
+router.post("/delete-item-by-category", usersController.deleteItemByCategory);
 router.post("/create-folder", usersController.createFolder);
 router.post("/get-folder", usersController.getFolder);
 router.post("/delete-folder", usersController.deleteFolder);
