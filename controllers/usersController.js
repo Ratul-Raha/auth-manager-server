@@ -162,13 +162,13 @@ const addItem = async (req, res, next) => {
 const getAllItems = async (req, res, next) => {
   const { folder, superEmail } = req.body;
   const user = await User.findOne({ email: superEmail });
-  const data = await Item.find().where("userId").equals(user._id);
+  const data = await Item.find().where("userId").equals(user._id).populate("folder");
   return res.status(200).send(data);
 };
 
 const getSingleItem = async (req, res, next) => {
   const { id } = req.body;
-  const data = await Item.findById({ _id: id });
+  const data = await Item.findById({ _id: id }).populate("folder");
   return res.status(200).send(data);
 };
 
@@ -205,6 +205,8 @@ const getCategoryWiseItemById = async (req, res, next) => {
 const updateCategoryWiseItem = async (req, res, next) => {
   const { name, username, password, url, notes, type, folder } =
     req.body.updatedItem;
+
+    const updateFolder = await Folder.findOne({folderName:folder});
   try {
     const item = await Item.findById(req.body.id);
     if (item) {
@@ -214,6 +216,7 @@ const updateCategoryWiseItem = async (req, res, next) => {
       item.url = url || item.url;
       item.notes = notes || item.notes;
       item.type = type || item.type;
+      item.folder = updateFolder.id;
       try {
         const result = await item.save();
         return res.status(200).send(item);
